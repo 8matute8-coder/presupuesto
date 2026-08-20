@@ -1,12 +1,81 @@
 /**
- * finance-logic.js - Algoritmos de cálculo financiero (BBVA 50/30/20, Galicia 3 Pasos, Washington Trust)
+ * finance-logic.js - Algoritmos de cálculo financiero adaptados a la planilla del usuario
  */
 
 class FinanceLogic {
   /**
-   * Obtiene resumen de ingresos, gastos y balance para un mes dado (formato YYYY-MM)
+   * Resumen y cálculo de la Planilla de Gastos Fijos (según el Excel del usuario)
    */
-  static getMonthSummary(transactions, monthStr) {
+  static getFixedExpensesSummary(fixedExpenses = [], incomeConfig = { baseIncome: 4200000, extraIncome: 150000 }) {
+    const baseIncome = Number(incomeConfig.baseIncome) || 0;
+    const extraIncome = Number(incomeConfig.extraIncome) || 0;
+    const totalIncome = baseIncome + extraIncome;
+
+    let totalFixed = 0;
+    let totalPaid = 0;
+    let totalPending = 0;
+
+    fixedExpenses.forEach(item => {
+      const amount = Number(item.amount) || 0;
+      totalFixed += amount;
+      if (item.isPaid) {
+        totalPaid += amount;
+      } else {
+        totalPending += amount;
+      }
+    });
+
+    const fixedPercentageOfIncome = totalIncome > 0 ? (totalFixed / totalIncome) * 100 : 0;
+    const netRemainder = totalIncome - totalFixed;
+
+    // Cálculo de días del mes actual y días restantes
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const currentDay = now.getDate();
+    const daysRemaining = Math.max(1, daysInCurrentMonth - currentDay + 1);
+
+    // Promedio gasto diario (base mes completo, ej. 31 días)
+    const dailyAverageMonth = daysInCurrentMonth > 0 ? netRemainder / daysInCurrentMonth : 0;
+    // Promedio gasto diario disponible para los días restantes
+    const dailyAverageRemainingDays = netRemainder / daysRemaining;
+
+    // Enriquecer cada ítem con sus porcentajes calculados
+    const enrichedExpenses = fixedExpenses.map(item => {
+      const amount = Number(item.amount) || 0;
+      const pctOfIncome = totalIncome > 0 ? (amount / totalIncome) * 100 : 0;
+      const pctOfFixed = totalFixed > 0 ? (amount / totalFixed) * 100 : 0;
+      return {
+        ...item,
+        amount,
+        pctOfIncome,
+        pctOfFixed
+      };
+    });
+
+    return {
+      baseIncome,
+      extraIncome,
+      totalIncome,
+      totalFixed,
+      totalPaid,
+      totalPending,
+      fixedPercentageOfIncome,
+      netRemainder,
+      daysInCurrentMonth,
+      currentDay,
+      daysRemaining,
+      dailyAverageMonth,
+      dailyAverageRemainingDays,
+      items: enrichedExpenses
+    };
+  }
+
+  /**
+   * Resumen de movimientos de ingresos, gastos y balance por mes
+   */
+  static getMonthSummary(transactions, monthStr, fixedExpenses = [], incomeConfig = { baseIncome: 4200000, extraIncome: 150000 }) {
     const monthTx = transactions.filter(t => t.date.startsWith(monthStr));
     
     let totalIncome = 0;
@@ -17,24 +86,27 @@ class FinanceLogic {
 
     const categoryBreakdown = {};
 
+    // Sumar transacciones reales
     monthTx.forEach(t => {
       const amount = Number(t.amount) || 0;
       if (t.type === 'income') {
         totalIncome += amount;
       } else {
         totalExpenses += amount;
-        
-        // Clasificación 50/30/20
         if (t.classification === 'need') needsSpent += amount;
         else if (t.classification === 'want') wantsSpent += amount;
         else if (t.classification === 'savings') savingsSpent += amount;
-        else needsSpent += amount; // Por defecto a necesidad
+        else needsSpent += amount;
 
-        // Desglose por categoría
         const cat = t.category || 'Otros';
         categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + amount;
       }
     });
+
+    // Si en el mes no se cargaron ingresos explícitos, tomamos los configurados en la planilla
+    if (totalIncome === 0) {
+      totalIncome = (Number(incomeConfig.baseIncome) || 0) + (Number(incomeConfig.extraIncome) || 0);
+    }
 
     const netBalance = totalIncome - totalExpenses;
     const savingsRate = totalIncome > 0 ? (savingsSpent / totalIncome) * 100 : 0;
@@ -55,14 +127,9 @@ class FinanceLogic {
 
   /**
    * Regla 50/30/20 (BBVA)
-   * Distribución recomendada:
-   * 50% Necesidades (Vivienda, Servicios, Comida, Transporte, Salud)
-   * 30% Deseos (Ocio, Restaurantes, Caprichos, Streaming)
-   * 20% Ahorro e Inversión / Pago de deudas
    */
-  static calculate503020(summary, expectedIncome = 0) {
-    // Si no hay ingresos cargados en el mes, usamos el ingreso esperado de la configuración
-    const baseIncome = summary.totalIncome > 0 ? summary.totalIncome : expectedIncome;
+  static calculate503020(summary, fixedSummary) {
+    const baseIncome = summary.totalIncome > 0 ? summary.totalIncome : fixedSummary.totalIncome;
 
     const targetNeeds = baseIncome * 0.50;
     const targetWants = baseIncome * 0.30;
@@ -123,107 +190,67 @@ class FinanceLogic {
   /**
    * Diagnóstico y Score de Salud Financiera (0 a 100)
    */
-  static calculateHealthScore(summary, budget503020, debts, bills) {
+  static calculateHealthScore(summary, budget503020, debts, fixedSummary) {
     let score = 0;
     const tips = [];
 
     // 1. Balance general (hasta 25 puntos)
-    if (summary.totalIncome > 0) {
-      if (summary.netBalance >= 0) {
-        score += 25;
-      } else {
-        const deficitRatio = Math.abs(summary.netBalance) / summary.totalIncome;
-        score += Math.max(0, Math.round(25 * (1 - deficitRatio)));
-        tips.push({
-          type: 'danger',
-          text: 'Tus gastos superan tus ingresos este mes. Revisa tus gastos en Deseos para volver a un flujo positivo.'
-        });
-      }
+    if (summary.netBalance >= 0) {
+      score += 25;
+    } else {
+      const deficitRatio = Math.abs(summary.netBalance) / (summary.totalIncome || 1);
+      score += Math.max(0, Math.round(25 * (1 - deficitRatio)));
+      tips.push({
+        type: 'danger',
+        text: 'Tus gastos superan tus ingresos del mes. Revisa gastos prescindibles para volver a un balance positivo.'
+      });
+    }
+
+    // 2. Control de Gastos Fijos (hasta 25 puntos)
+    if (fixedSummary.fixedPercentageOfIncome <= 55) {
+      score += 25;
+    } else if (fixedSummary.fixedPercentageOfIncome <= 65) {
+      score += 18;
+      tips.push({
+        type: 'info',
+        text: `Tus gastos fijos representan el ${fixedSummary.fixedPercentageOfIncome.toFixed(1)}% de tus ingresos. Para cumplir el 50/30/20 estricto, adapta los gastos variables y cuida el disponible diario de ${UIManager.formatCurrency(fixedSummary.dailyAverageMonth)}/día.`
+      });
     } else {
       score += 10;
       tips.push({
-        type: 'info',
-        text: 'Registra tus ingresos mensuales para un cálculo preciso de salud financiera.'
-      });
-    }
-
-    // 2. Cumplimiento de la regla 50/30/20 (hasta 30 puntos)
-    let ruleScore = 0;
-    if (budget503020.needs.percentOfIncome <= 55) ruleScore += 12;
-    else if (budget503020.needs.percentOfIncome <= 65) ruleScore += 6;
-    else {
-      tips.push({
         type: 'warning',
-        text: `Tus necesidades consumen el ${budget503020.needs.percentOfIncome.toFixed(1)}% de tus ingresos (recomendado máximo 50%). Considera optimizar servicios o gastos fijos.`
+        text: `Tus gastos fijos comprometen el ${fixedSummary.fixedPercentageOfIncome.toFixed(1)}% de tus ingresos. Revisa servicios o cuotas para recuperar margen de ahorro.`
       });
     }
-
-    if (budget503020.wants.percentOfIncome <= 30) ruleScore += 10;
-    else if (budget503020.wants.percentOfIncome <= 40) ruleScore += 5;
-    else {
-      tips.push({
-        type: 'warning',
-        text: `Tus deseos y caprichos están en ${budget503020.wants.percentOfIncome.toFixed(1)}% (meta 30%). Ajustar salidas y compras impulsivas liberará dinero para ahorrar.`
-      });
-    }
-
-    if (budget503020.savings.percentOfIncome >= 20) ruleScore += 8;
-    else if (budget503020.savings.percentOfIncome >= 10) ruleScore += 4;
-    else {
-      tips.push({
-        type: 'info',
-        text: 'Aplica la regla "Págate a ti primero" de Washington Trust: aparta al menos el 20% al recibir tus ingresos.'
-      });
-    }
-    score += ruleScore;
 
     // 3. Control de deudas (hasta 25 puntos)
     const totalDebt = debts.reduce((sum, d) => sum + Number(d.remainingAmount || 0), 0);
-    const monthlyDebtPayments = debts.reduce((sum, d) => sum + Number(d.minimumPayment || 0), 0);
-    
     if (debts.length === 0 || totalDebt === 0) {
       score += 25;
     } else {
-      const debtRatio = summary.totalIncome > 0 ? (monthlyDebtPayments / summary.totalIncome) * 100 : 30;
-      if (debtRatio <= 20) score += 20;
-      else if (debtRatio <= 35) {
-        score += 12;
-        tips.push({
-          type: 'warning',
-          text: `El servicio de tus deudas absorbe el ${debtRatio.toFixed(1)}% de tus ingresos. Utiliza el método Bola de Nieve para acelerar su cancelación.`
-        });
-      } else {
-        score += 5;
-        tips.push({
-          type: 'danger',
-          text: 'Nivel alto de endeudamiento. Prioriza el pago de deudas de mayor tasa con el método Avalancha de Galicia.'
-        });
-      }
+      score += 18;
+      tips.push({
+        type: 'info',
+        text: 'Mantén al día el resumen de la tarjeta para no devengar intereses rotativos.'
+      });
     }
 
-    // 4. Puntualidad en Facturas (hasta 20 puntos)
-    const pendingBills = bills.filter(b => !b.isPaid);
-    const currentDay = new Date().getDate();
-    const overdueBills = pendingBills.filter(b => b.dueDay < currentDay);
-
-    if (overdueBills.length === 0) {
-      score += 20;
+    // 4. Cumplimiento de pagos de la planilla (hasta 25 puntos)
+    const pendingCount = fixedSummary.items.filter(i => !i.isPaid && i.amount > 0).length;
+    if (pendingCount === 0) {
+      score += 25;
     } else {
-      score += 5;
-      tips.push({
-        type: 'danger',
-        text: `Tienes ${overdueBills.length} factura(s) con fecha de vencimiento superada. Pagarlas a tiempo evita recargos e intereses moratorios.`
-      });
+      score += 20;
     }
 
     score = Math.min(100, Math.max(0, score));
 
-    let level = 'Saludable';
+    let level = 'Excelente';
     let color = 'emerald';
     if (score >= 85) { level = 'Excelente'; color = 'emerald'; }
     else if (score >= 70) { level = 'Bueno'; color = 'blue'; }
-    else if (score >= 50) { level = 'Regular / Atención'; color = 'amber'; }
-    else { level = 'Crítico / Requiere Acción'; color = 'rose'; }
+    else if (score >= 50) { level = 'Regular'; color = 'amber'; }
+    else { level = 'Atención'; color = 'rose'; }
 
     return {
       score,
@@ -233,14 +260,8 @@ class FinanceLogic {
     };
   }
 
-  /**
-   * Estrategias de desendeudamiento (Galicia Paso 2)
-   * Bola de nieve (Snowball): ordenado de menor a mayor saldo restante.
-   * Avalancha (Avalanche): ordenado de mayor a menor tasa de interés.
-   */
   static getDebtStrategies(debts) {
     if (!debts || debts.length === 0) return { snowball: [], avalanche: [], totalDebt: 0, totalMinPayment: 0 };
-
     const validDebts = debts.map(d => ({
       ...d,
       remainingAmount: Number(d.remainingAmount) || 0,
@@ -250,22 +271,12 @@ class FinanceLogic {
 
     const totalDebt = validDebts.reduce((sum, d) => sum + d.remainingAmount, 0);
     const totalMinPayment = validDebts.reduce((sum, d) => sum + d.minimumPayment, 0);
-
     const snowball = [...validDebts].sort((a, b) => a.remainingAmount - b.remainingAmount);
     const avalanche = [...validDebts].sort((a, b) => b.interestRate - a.interestRate);
 
-    return {
-      snowball,
-      avalanche,
-      totalDebt,
-      totalMinPayment
-    };
+    return { snowball, avalanche, totalDebt, totalMinPayment };
   }
 
-  /**
-   * Cálculo de Metas de Ahorro (Galicia Paso 3 & Washington Trust)
-   * Calcula cuánto se debe ahorrar por mes para cumplir la meta en la fecha pactada.
-   */
   static calculateGoalPacing(goal) {
     const target = Number(goal.targetAmount) || 0;
     const current = Number(goal.currentAmount) || 0;
@@ -284,49 +295,6 @@ class FinanceLogic {
       suggestedMonthly = remaining / monthsLeft;
     }
 
-    return {
-      ...goal,
-      remaining,
-      progress,
-      monthsLeft,
-      suggestedMonthly
-    };
-  }
-
-  /**
-   * Alertas de Facturas (Washington Trust Clave 5)
-   */
-  static getUpcomingBills(bills, daysWindow = 7) {
-    const currentDay = new Date().getDate();
-    return bills.map(b => {
-      const dueDay = Number(b.dueDay) || 1;
-      const daysUntilDue = dueDay - currentDay;
-      let status = 'normal';
-      let statusText = `Vence en ${daysUntilDue} días (Día ${dueDay})`;
-
-      if (b.isPaid) {
-        status = 'paid';
-        statusText = 'Pagada';
-      } else if (daysUntilDue < 0) {
-        status = 'overdue';
-        statusText = `Vencida hace ${Math.abs(daysUntilDue)} días`;
-      } else if (daysUntilDue === 0) {
-        status = 'due-today';
-        statusText = '¡Vence hoy!';
-      } else if (daysUntilDue <= daysWindow) {
-        status = 'due-soon';
-        statusText = `Vence en ${daysUntilDue} días`;
-      }
-
-      return {
-        ...b,
-        daysUntilDue,
-        status,
-        statusText
-      };
-    }).sort((a, b) => {
-      if (a.isPaid !== b.isPaid) return a.isPaid ? 1 : -1;
-      return a.dueDay - b.dueDay;
-    });
+    return { ...goal, remaining, progress, monthsLeft, suggestedMonthly };
   }
 }

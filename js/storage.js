@@ -4,6 +4,8 @@
 
 const STORAGE_KEYS = {
   TRANSACTIONS: 'finanzas360_transactions',
+  FIXED_EXPENSES: 'finanzas360_fixed_expenses',
+  INCOME_CONFIG: 'finanzas360_income_config',
   BILLS: 'finanzas360_bills',
   DEBTS: 'finanzas360_debts',
   GOALS: 'finanzas360_goals',
@@ -11,178 +13,100 @@ const STORAGE_KEYS = {
   THEME: 'finanzas360_theme'
 };
 
+const DEFAULT_INCOME_CONFIG = {
+  baseIncome: 4200000,
+  extraIncome: 150000
+};
+
 const DEFAULT_CONFIG = {
   currency: 'ARS',
   currencySymbol: '$',
-  monthlyExpectedIncome: 650000,
+  monthlyExpectedIncome: 4350000,
   emergencyFundMonths: 3,
-  debtStrategy: 'snowball', // 'snowball' (menor saldo) o 'avalanche' (mayor tasa)
+  debtStrategy: 'snowball', // 'snowball' o 'avalanche'
 };
 
+// Gastos fijos predefinidos según planilla del usuario (100% editables)
+const DEFAULT_FIXED_EXPENSES = [
+  { id: 'fix-1', concept: 'Alquiler', amount: 460000, isPaid: false, category: 'Vivienda', classification: 'need' },
+  { id: 'fix-2', concept: 'Tarjeta', amount: 534000, isPaid: false, category: 'Finanzas / Tarjetas', classification: 'need' },
+  { id: 'fix-3', concept: 'Agua', amount: 0, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-4', concept: 'Nafta', amount: 0, isPaid: false, category: 'Transporte', classification: 'need' },
+  { id: 'fix-5', concept: 'Patente', amount: 15000, isPaid: false, category: 'Impuestos / Vehículo', classification: 'need' },
+  { id: 'fix-6', concept: 'Luz', amount: 0, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-7', concept: 'Internet', amount: 62000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-8', concept: 'Celulares', amount: 30000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-9', concept: 'Gasnor', amount: 40000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-10', concept: 'Colegio Mati', amount: 155000, isPaid: false, category: 'Educación', classification: 'need' },
+  { id: 'fix-11', concept: 'Colegio Sol', amount: 280000, isPaid: false, category: 'Educación', classification: 'need' },
+  { id: 'fix-12', concept: 'Colegio Lola', amount: 150000, isPaid: false, category: 'Educación', classification: 'need' },
+  { id: 'fix-13', concept: 'Gimnasio', amount: 93000, isPaid: false, category: 'Salud / Bienestar', classification: 'want' },
+  { id: 'fix-14', concept: 'Mama Sueldo', amount: 200000, isPaid: false, category: 'Familia / Personal', classification: 'need' },
+  { id: 'fix-15', concept: 'Facu', amount: 680000, isPaid: false, category: 'Educación / Universidad', classification: 'need' }
+];
+
 const SAMPLE_TRANSACTIONS = [
-  // Ingresos del mes actual
   {
     id: 'tx-1',
     date: new Date().toISOString().slice(0, 10),
     type: 'income',
-    amount: 650000,
+    amount: 4200000,
     category: 'Salario / Sueldo',
     classification: 'income',
     paymentMethod: 'Transferencia',
-    notes: 'Sueldo mensual neto'
+    notes: 'Ingreso mensual base'
   },
-  // Necesidades (50%)
   {
     id: 'tx-2',
-    date: new Date(new Date().setDate(2)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 180000,
-    category: 'Vivienda / Alquiler',
-    classification: 'need',
+    date: new Date().toISOString().slice(0, 10),
+    type: 'income',
+    amount: 150000,
+    category: 'Otros Ingresos',
+    classification: 'income',
     paymentMethod: 'Transferencia',
-    notes: 'Alquiler departamento'
+    notes: 'Ingreso extra del mes'
   },
   {
     id: 'tx-3',
-    date: new Date(new Date().setDate(5)).toISOString().slice(0, 10),
+    date: new Date(new Date().setDate(2)).toISOString().slice(0, 10),
     type: 'expense',
-    amount: 28000,
-    category: 'Servicios (Luz, Gas, Internet)',
+    amount: 460000,
+    category: 'Alquiler',
     classification: 'need',
-    paymentMethod: 'Débito',
-    notes: 'Internet fibra óptica y luz'
+    paymentMethod: 'Transferencia',
+    notes: 'Alquiler mensual'
   },
   {
     id: 'tx-4',
-    date: new Date(new Date().setDate(8)).toISOString().slice(0, 10),
+    date: new Date(new Date().setDate(5)).toISOString().slice(0, 10),
     type: 'expense',
-    amount: 75000,
-    category: 'Supermercado & Alimentación',
+    amount: 534000,
+    category: 'Tarjeta',
     classification: 'need',
     paymentMethod: 'Débito',
-    notes: 'Compra mensual de alimentos'
+    notes: 'Resumen mensual de tarjeta'
   },
   {
     id: 'tx-5',
-    date: new Date(new Date().setDate(12)).toISOString().slice(0, 10),
+    date: new Date(new Date().setDate(7)).toISOString().slice(0, 10),
     type: 'expense',
-    amount: 22000,
-    category: 'Transporte & Combustible',
+    amount: 680000,
+    category: 'Facu',
     classification: 'need',
-    paymentMethod: 'Efectivo',
-    notes: 'Carga de combustible y tarjeta de transporte'
-  },
-  // Deseos (30%)
-  {
-    id: 'tx-6',
-    date: new Date(new Date().setDate(9)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 32000,
-    category: 'Salidas & Restaurantes',
-    classification: 'want',
-    paymentMethod: 'Tarjeta de Crédito',
-    notes: 'Cena con amigos fin de semana'
-  },
-  {
-    id: 'tx-7',
-    date: new Date(new Date().setDate(10)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 8500,
-    category: 'Streaming & Suscripciones',
-    classification: 'want',
-    paymentMethod: 'Tarjeta de Crédito',
-    notes: 'Netflix y Spotify'
-  },
-  {
-    id: 'tx-8',
-    date: new Date(new Date().setDate(14)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 25000,
-    category: 'Compras & Caprichos',
-    classification: 'want',
-    paymentMethod: 'Débito',
-    notes: 'Ropa / Calzado de temporada'
-  },
-  // Ahorro e Inversión / Deuda (20%)
-  {
-    id: 'tx-9',
-    date: new Date(new Date().setDate(3)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 70000,
-    category: 'Ahorro / Fondo Emergencia',
-    classification: 'savings',
     paymentMethod: 'Transferencia',
-    notes: 'Págate a ti primero - Fondo de reserva'
-  },
-  {
-    id: 'tx-10',
-    date: new Date(new Date().setDate(4)).toISOString().slice(0, 10),
-    type: 'expense',
-    amount: 45000,
-    category: 'Pago de Deudas',
-    classification: 'savings',
-    paymentMethod: 'Transferencia',
-    notes: 'Cuota préstamo personal'
-  }
-];
-
-const SAMPLE_BILLS = [
-  {
-    id: 'bill-1',
-    name: 'Alquiler del Hogar',
-    amount: 180000,
-    dueDay: 5,
-    category: 'Vivienda',
-    isPaid: true,
-    autoPay: true
-  },
-  {
-    id: 'bill-2',
-    name: 'Servicio de Internet & TV',
-    amount: 18500,
-    dueDay: 10,
-    category: 'Servicios',
-    isPaid: true,
-    autoPay: true
-  },
-  {
-    id: 'bill-3',
-    name: 'Resumen Tarjeta de Crédito',
-    amount: 68000,
-    dueDay: 22,
-    category: 'Finanzas',
-    isPaid: false,
-    autoPay: false
-  },
-  {
-    id: 'bill-4',
-    name: 'Seguro Automotor / Médico',
-    amount: 31000,
-    dueDay: 28,
-    category: 'Seguros',
-    isPaid: false,
-    autoPay: true
+    notes: 'Cuota universidad Facu'
   }
 ];
 
 const SAMPLE_DEBTS = [
   {
     id: 'debt-1',
-    name: 'Tarjeta de Crédito Banco',
-    totalAmount: 150000,
-    remainingAmount: 95000,
-    interestRate: 65.0, // TEA estimada %
-    minimumPayment: 18000,
-    notes: 'Consumos en cuotas anteriores'
-  },
-  {
-    id: 'debt-2',
-    name: 'Préstamo Personal',
-    totalAmount: 300000,
-    remainingAmount: 180000,
-    interestRate: 48.5,
-    minimumPayment: 32000,
-    notes: 'Refacción del hogar (6 cuotas restantes)'
+    name: 'Resumen Tarjeta',
+    totalAmount: 534000,
+    remainingAmount: 534000,
+    interestRate: 60.0,
+    minimumPayment: 85000,
+    notes: 'Gastos y compras en cuotas'
   }
 ];
 
@@ -190,17 +114,17 @@ const SAMPLE_GOALS = [
   {
     id: 'goal-1',
     name: 'Fondo de Emergencia (3 meses)',
-    targetAmount: 900000,
-    currentAmount: 450000,
+    targetAmount: 5000000,
+    currentAmount: 1650000,
     deadline: '2026-12-31',
     category: 'Seguridad',
     icon: 'shield-check'
   },
   {
     id: 'goal-2',
-    name: 'Vacaciones de Verano',
-    targetAmount: 500000,
-    currentAmount: 200000,
+    name: 'Vacaciones Familiares',
+    targetAmount: 2000000,
+    currentAmount: 600000,
     deadline: '2027-01-15',
     category: 'Viajes',
     icon: 'plane'
@@ -230,11 +154,14 @@ class StorageManager {
     if (!localStorage.getItem(STORAGE_KEYS.CONFIG)) {
       this.set(STORAGE_KEYS.CONFIG, DEFAULT_CONFIG);
     }
+    if (!localStorage.getItem(STORAGE_KEYS.INCOME_CONFIG)) {
+      this.set(STORAGE_KEYS.INCOME_CONFIG, DEFAULT_INCOME_CONFIG);
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.FIXED_EXPENSES)) {
+      this.set(STORAGE_KEYS.FIXED_EXPENSES, DEFAULT_FIXED_EXPENSES);
+    }
     if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
       this.set(STORAGE_KEYS.TRANSACTIONS, SAMPLE_TRANSACTIONS);
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.BILLS)) {
-      this.set(STORAGE_KEYS.BILLS, SAMPLE_BILLS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.DEBTS)) {
       this.set(STORAGE_KEYS.DEBTS, SAMPLE_DEBTS);
@@ -244,20 +171,28 @@ class StorageManager {
     }
   }
 
+  static getFixedExpenses() {
+    return this.get(STORAGE_KEYS.FIXED_EXPENSES, DEFAULT_FIXED_EXPENSES);
+  }
+
+  static saveFixedExpenses(expenses) {
+    this.set(STORAGE_KEYS.FIXED_EXPENSES, expenses);
+  }
+
+  static getIncomeConfig() {
+    return this.get(STORAGE_KEYS.INCOME_CONFIG, DEFAULT_INCOME_CONFIG);
+  }
+
+  static saveIncomeConfig(incomeConfig) {
+    this.set(STORAGE_KEYS.INCOME_CONFIG, incomeConfig);
+  }
+
   static getTransactions() {
     return this.get(STORAGE_KEYS.TRANSACTIONS, []);
   }
 
   static saveTransactions(transactions) {
     this.set(STORAGE_KEYS.TRANSACTIONS, transactions);
-  }
-
-  static getBills() {
-    return this.get(STORAGE_KEYS.BILLS, []);
-  }
-
-  static saveBills(bills) {
-    this.set(STORAGE_KEYS.BILLS, bills);
   }
 
   static getDebts() {
@@ -294,11 +229,12 @@ class StorageManager {
 
   static exportJSON() {
     const backup = {
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       config: this.getConfig(),
+      incomeConfig: this.getIncomeConfig(),
+      fixedExpenses: this.getFixedExpenses(),
       transactions: this.getTransactions(),
-      bills: this.getBills(),
       debts: this.getDebts(),
       goals: this.getGoals()
     };
@@ -306,7 +242,7 @@ class StorageManager {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `respaldo-finanzas-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `respaldo-finanzas360-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -314,8 +250,9 @@ class StorageManager {
   static importJSON(jsonString) {
     try {
       const parsed = JSON.parse(jsonString);
+      if (parsed.fixedExpenses) this.saveFixedExpenses(parsed.fixedExpenses);
+      if (parsed.incomeConfig) this.saveIncomeConfig(parsed.incomeConfig);
       if (parsed.transactions) this.saveTransactions(parsed.transactions);
-      if (parsed.bills) this.saveBills(parsed.bills);
       if (parsed.debts) this.saveDebts(parsed.debts);
       if (parsed.goals) this.saveGoals(parsed.goals);
       if (parsed.config) this.saveConfig(parsed.config);
@@ -327,23 +264,15 @@ class StorageManager {
   }
 
   static exportCSV(monthFilter = null) {
-    const transactions = this.getTransactions().filter(tx => {
-      if (!monthFilter) return true;
-      return tx.date.startsWith(monthFilter);
-    });
-
-    if (transactions.length === 0) return false;
-
-    const headers = ['ID', 'Fecha', 'Tipo', 'Monto', 'Categoría', 'Clasificación 50/30/20', 'Medio de Pago', 'Notas'];
-    const rows = transactions.map(t => [
-      `"${t.id}"`,
-      `"${t.date}"`,
-      `"${t.type === 'income' ? 'Ingreso' : 'Gasto'}"`,
-      t.amount,
-      `"${t.category || ''}"`,
-      `"${t.classification || ''}"`,
-      `"${t.paymentMethod || ''}"`,
-      `"${(t.notes || '').replace(/"/g, '""')}"`
+    const fixed = this.getFixedExpenses();
+    const headers = ['ID', 'Concepto', 'Monto', 'Pagado', 'Categoría', 'Clasificación'];
+    const rows = fixed.map(f => [
+      `"${f.id}"`,
+      `"${f.concept}"`,
+      f.amount,
+      f.isPaid ? 'SI' : 'NO',
+      `"${f.category || ''}"`,
+      `"${f.classification || ''}"`
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -351,7 +280,7 @@ class StorageManager {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `reporte-gastos-${monthFilter || 'completo'}.csv`;
+    a.download = `gastos-fijos-${monthFilter || 'mensual'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     return true;
@@ -359,15 +288,16 @@ class StorageManager {
 
   static resetToSampleData() {
     this.set(STORAGE_KEYS.CONFIG, DEFAULT_CONFIG);
+    this.set(STORAGE_KEYS.INCOME_CONFIG, DEFAULT_INCOME_CONFIG);
+    this.set(STORAGE_KEYS.FIXED_EXPENSES, DEFAULT_FIXED_EXPENSES);
     this.set(STORAGE_KEYS.TRANSACTIONS, SAMPLE_TRANSACTIONS);
-    this.set(STORAGE_KEYS.BILLS, SAMPLE_BILLS);
     this.set(STORAGE_KEYS.DEBTS, SAMPLE_DEBTS);
     this.set(STORAGE_KEYS.GOALS, SAMPLE_GOALS);
   }
 
   static clearAllData() {
+    this.set(STORAGE_KEYS.FIXED_EXPENSES, []);
     this.set(STORAGE_KEYS.TRANSACTIONS, []);
-    this.set(STORAGE_KEYS.BILLS, []);
     this.set(STORAGE_KEYS.DEBTS, []);
     this.set(STORAGE_KEYS.GOALS, []);
   }

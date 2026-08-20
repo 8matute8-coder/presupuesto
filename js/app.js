@@ -24,8 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 7. Inicializar Eventos de Configuración y Respaldo
   initSettingsAndBackup();
 
-  // 8. Renderizar Vista Inicial
-  UIManager.switchTab('dashboard');
+  // 8. Renderizar Vista Inicial (Planilla de Gastos Fijos)
+  UIManager.switchTab('fixed_sheet');
 
   if (window.lucide) lucide.createIcons();
 });
@@ -96,14 +96,14 @@ function closeModal(modalId) {
 
 function initModalsAndForms() {
   // Botones de Abrir Modales
+  document.getElementById('btn-open-add-fixed-modal')?.addEventListener('click', () => {
+    openModal('modal-add-fixed');
+  });
+
   document.getElementById('btn-open-tx-modal')?.addEventListener('click', () => {
     const dateInput = document.getElementById('tx-date');
     if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
     openModal('modal-add-transaction');
-  });
-
-  document.getElementById('btn-open-bill-modal')?.addEventListener('click', () => {
-    openModal('modal-add-bill');
   });
 
   document.getElementById('btn-open-debt-modal')?.addEventListener('click', () => {
@@ -129,46 +129,36 @@ function initModalsAndForms() {
     }
   });
 
-  // Auto-clasificación 50/30/20 sugerida al seleccionar categoría
-  const categorySelect = document.getElementById('tx-category');
-  const classSelect = document.getElementById('tx-classification');
-  const typeSelect = document.getElementById('tx-type');
+  // Submit: Formulario Nuevo Gasto Fijo
+  document.getElementById('form-add-fixed')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const concept = document.getElementById('fixed-concept').value.trim();
+    const amount = Number(document.getElementById('fixed-amount').value);
+    const category = document.getElementById('fixed-category').value;
 
-  const defaultCategoryClassification = {
-    'Vivienda / Alquiler': 'need',
-    'Servicios (Luz, Gas, Internet)': 'need',
-    'Supermercado & Alimentación': 'need',
-    'Transporte & Combustible': 'need',
-    'Salud & Farmacia': 'need',
-    'Educación': 'need',
-    'Salidas & Restaurantes': 'want',
-    'Streaming & Suscripciones': 'want',
-    'Compras & Caprichos': 'want',
-    'Viajes & Vacaciones': 'want',
-    'Ahorro / Fondo Emergencia': 'savings',
-    'Pago de Deudas': 'savings',
-    'Inversiones': 'savings',
-    'Salario / Sueldo': 'income',
-    'Otros Ingresos': 'income'
-  };
+    if (!concept || isNaN(amount) || amount < 0) {
+      alert('Ingresa un concepto y monto válidos.');
+      return;
+    }
 
-  if (categorySelect && classSelect) {
-    categorySelect.addEventListener('change', () => {
-      const cat = categorySelect.value;
-      const suggested = defaultCategoryClassification[cat];
-      if (suggested) {
-        if (suggested === 'income') {
-          if (typeSelect) typeSelect.value = 'income';
-          classSelect.value = 'income';
-        } else {
-          if (typeSelect) typeSelect.value = 'expense';
-          classSelect.value = suggested;
-        }
-      }
+    const fixed = StorageManager.getFixedExpenses();
+    fixed.push({
+      id: 'fix-' + Date.now(),
+      concept,
+      amount,
+      isPaid: false,
+      category,
+      classification: category === 'Salud / Bienestar' ? 'want' : 'need'
     });
-  }
+    StorageManager.saveFixedExpenses(fixed);
 
-  // Submit: Formulario Movimiento
+    closeModal('modal-add-fixed');
+    document.getElementById('form-add-fixed').reset();
+    UIManager.refreshCurrentView();
+    UIManager.showToast(`"${concept}" agregado a los gastos fijos.`);
+  });
+
+  // Submit: Formulario Movimiento Variable
   document.getElementById('form-add-transaction')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const type = document.getElementById('tx-type').value;
@@ -205,47 +195,12 @@ function initModalsAndForms() {
     UIManager.showToast('¡Movimiento guardado con éxito!');
   });
 
-  // Submit: Formulario Factura
-  document.getElementById('form-add-bill')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = document.getElementById('bill-name').value;
-    const amount = Number(document.getElementById('bill-amount').value);
-    const dueDay = Number(document.getElementById('bill-dueday').value);
-    const category = document.getElementById('bill-category').value;
-    const isPaid = document.getElementById('bill-ispaid').checked;
-
-    if (!name || !amount || !dueDay) {
-      alert('Completa los campos obligatorios.');
-      return;
-    }
-
-    const newBill = {
-      id: 'bill-' + Date.now(),
-      name,
-      amount,
-      dueDay,
-      category,
-      isPaid
-    };
-
-    const bills = StorageManager.getBills();
-    bills.push(newBill);
-    StorageManager.saveBills(bills);
-
-    closeModal('modal-add-bill');
-    document.getElementById('form-add-bill').reset();
-    UIManager.refreshCurrentView();
-    UIManager.showToast('Factura recurrente registrada.');
-  });
-
   // Submit: Formulario Deuda
   document.getElementById('form-add-debt')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('debt-name').value;
     const totalAmount = Number(document.getElementById('debt-total').value);
     const remainingAmount = Number(document.getElementById('debt-remaining').value) || totalAmount;
-    const interestRate = Number(document.getElementById('debt-interest').value) || 0;
-    const minimumPayment = Number(document.getElementById('debt-minpayment').value) || 0;
 
     if (!name || !totalAmount) {
       alert('Completa el nombre y monto de la deuda.');
@@ -257,8 +212,8 @@ function initModalsAndForms() {
       name,
       totalAmount,
       remainingAmount,
-      interestRate,
-      minimumPayment
+      interestRate: 60,
+      minimumPayment: Math.round(remainingAmount * 0.15)
     };
 
     const debts = StorageManager.getDebts();
@@ -277,8 +232,6 @@ function initModalsAndForms() {
     const name = document.getElementById('goal-name').value;
     const targetAmount = Number(document.getElementById('goal-target').value);
     const currentAmount = Number(document.getElementById('goal-current').value) || 0;
-    const deadline = document.getElementById('goal-deadline').value;
-    const icon = document.getElementById('goal-icon').value || 'target';
 
     if (!name || !targetAmount) {
       alert('Completa el nombre y el monto meta.');
@@ -290,8 +243,8 @@ function initModalsAndForms() {
       name,
       targetAmount,
       currentAmount,
-      deadline,
-      icon
+      deadline: '2026-12-31',
+      icon: 'shield-check'
     };
 
     const goals = StorageManager.getGoals();
@@ -304,14 +257,12 @@ function initModalsAndForms() {
     UIManager.showToast('Nueva meta de ahorro creada.');
   });
 
-  // Filtros de búsqueda en tabla de movimientos
+  // Búsqueda y filtros de movimientos
   document.getElementById('tx-search-input')?.addEventListener('input', () => UIManager.renderTransactions());
-  document.getElementById('tx-filter-category')?.addEventListener('change', () => UIManager.renderTransactions());
   document.getElementById('tx-filter-class')?.addEventListener('change', () => UIManager.renderTransactions());
 }
 
 function initInteractiveCalculators() {
-  // Simulador Regla 50/30/20
   const calcBaseIncome = document.getElementById('calc-base-income');
   if (calcBaseIncome) {
     calcBaseIncome.addEventListener('input', () => {
@@ -326,53 +277,14 @@ function initInteractiveCalculators() {
       document.getElementById('calc-target-savings').textContent = UIManager.formatCurrency(targetSavings, config.currencySymbol);
     });
   }
-
-  // Calculadora Ahorro Automático "Págate a ti primero"
-  const autoSaveIncome = document.getElementById('auto-save-income');
-  const autoSavePct = document.getElementById('auto-save-pct');
-  const autoSaveResult = document.getElementById('auto-save-result');
-
-  const updateAutoSave = () => {
-    const config = StorageManager.getConfig();
-    const income = Number(autoSaveIncome?.value) || 0;
-    const pct = Number(autoSavePct?.value) || 20;
-    if (autoSaveResult) {
-      autoSaveResult.textContent = UIManager.formatCurrency(income * (pct / 100), config.currencySymbol);
-    }
-  };
-
-  autoSaveIncome?.addEventListener('input', updateAutoSave);
-  autoSavePct?.addEventListener('change', updateAutoSave);
 }
 
 function initSettingsAndBackup() {
-  // Guardar Configuración
-  document.getElementById('form-settings')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const currency = document.getElementById('setting-currency').value;
-    const expectedIncome = Number(document.getElementById('setting-expected-income').value) || 0;
-    const debtStrategy = document.getElementById('setting-debt-strategy').value;
-
-    const symbols = { ARS: '$', USD: 'US$', EUR: '€', MXN: '$', COP: '$', CLP: '$' };
-
-    StorageManager.saveConfig({
-      currency,
-      currencySymbol: symbols[currency] || '$',
-      monthlyExpectedIncome: expectedIncome,
-      debtStrategy
-    });
-
-    UIManager.refreshCurrentView();
-    UIManager.showToast('Configuración guardada correctamente.');
-  });
-
-  // Exportar CSV
-  document.getElementById('btn-export-csv')?.addEventListener('click', () => {
+  // Exportar CSV de Gastos Fijos
+  document.getElementById('btn-export-sheet-csv')?.addEventListener('click', () => {
     const success = StorageManager.exportCSV(UIManager.selectedMonth);
     if (success) {
-      UIManager.showToast('Reporte CSV descargado.');
-    } else {
-      alert('No hay movimientos en este mes para exportar.');
+      UIManager.showToast('Planilla de gastos fijos exportada a CSV.');
     }
   });
 
@@ -404,21 +316,21 @@ function initSettingsAndBackup() {
     reader.readAsText(file);
   });
 
-  // Restaurar datos de ejemplo
+  // Restaurar a datos de ejemplo
   document.getElementById('btn-reset-sample')?.addEventListener('click', () => {
-    if (confirm('¿Restablecer datos a los valores de ejemplo? (Se sobrescribirán los datos actuales)')) {
+    if (confirm('¿Restablecer la planilla a los valores originales de tu imagen?')) {
       StorageManager.resetToSampleData();
       UIManager.refreshCurrentView();
-      UIManager.showToast('Datos de ejemplo restablecidos.');
+      UIManager.showToast('Planilla restablecida.');
     }
   });
 
   // Limpiar todos los datos
   document.getElementById('btn-clear-all')?.addEventListener('click', () => {
-    if (confirm('ATENCIÓN: ¿Deseas borrar TODOS tus movimientos, deudas, metas y facturas? Esta acción es irreversible.')) {
+    if (confirm('ATENCIÓN: ¿Deseas borrar todos los datos?')) {
       StorageManager.clearAllData();
       UIManager.refreshCurrentView();
-      UIManager.showToast('Todos los datos han sido eliminados.', 'warning');
+      UIManager.showToast('Datos eliminados.', 'warning');
     }
   });
 }
