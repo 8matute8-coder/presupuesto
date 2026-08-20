@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e1b4b" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Fondo redondeado con gradiente -->
+  <rect width="512" height="512" rx="128" fill="url(#grad)" />
+  
+  <!-- Ícono Billetera y Finanzas -->
+  <g filter="url(#shadow)" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Contorno Billetera -->
+    <rect x="96" y="144" width="320" height="240" rx="36" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-width="26" />
+    
+    <!-- Tapa superior / Solapa -->
+    <path d="M96 224h320" stroke="#ffffff" stroke-width="22" stroke-opacity="0.6"/>
+    
+    <!-- Cierre / Broche con Moneda -->
+    <rect x="300" y="228" width="116" height="72" rx="20" fill="#2563eb" stroke="#ffffff" stroke-width="24" />
+    <circle cx="358" cy="264" r="14" fill="#fbbf24" stroke="#ffffff" stroke-width="8"/>
+    
+    <!-- Gráfico de Crecimiento Ascendente -->
+    <path d="M144 324l54-54 44 44 72-72" stroke="#34d399" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M280 242h34v34" stroke="#34d399" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

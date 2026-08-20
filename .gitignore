@@ -1,10 +1,9 @@
-# Archivos con datos sensibles y credenciales privadas
-js/firebase-config.js
+# Archivos temporales y de entorno local
 .env
 .env.local
 *.log
 
-# Dependencias y temporales
+# Dependencias y sistema
 node_modules/
 .DS_Store
 Thumbs.db
