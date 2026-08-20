@@ -150,6 +150,12 @@ class StorageManager {
     }
   }
 
+  static notifyCloudSync() {
+    if (typeof FirebaseService !== 'undefined' && FirebaseService.triggerAutoSync) {
+      FirebaseService.triggerAutoSync();
+    }
+  }
+
   static initStorage() {
     if (!localStorage.getItem(STORAGE_KEYS.CONFIG)) {
       this.set(STORAGE_KEYS.CONFIG, DEFAULT_CONFIG);
@@ -177,6 +183,7 @@ class StorageManager {
 
   static saveFixedExpenses(expenses) {
     this.set(STORAGE_KEYS.FIXED_EXPENSES, expenses);
+    this.notifyCloudSync();
   }
 
   static getIncomeConfig() {
@@ -185,6 +192,7 @@ class StorageManager {
 
   static saveIncomeConfig(incomeConfig) {
     this.set(STORAGE_KEYS.INCOME_CONFIG, incomeConfig);
+    this.notifyCloudSync();
   }
 
   static getTransactions() {
@@ -193,6 +201,7 @@ class StorageManager {
 
   static saveTransactions(transactions) {
     this.set(STORAGE_KEYS.TRANSACTIONS, transactions);
+    this.notifyCloudSync();
   }
 
   static getDebts() {
@@ -201,6 +210,7 @@ class StorageManager {
 
   static saveDebts(debts) {
     this.set(STORAGE_KEYS.DEBTS, debts);
+    this.notifyCloudSync();
   }
 
   static getGoals() {
@@ -209,6 +219,7 @@ class StorageManager {
 
   static saveGoals(goals) {
     this.set(STORAGE_KEYS.GOALS, goals);
+    this.notifyCloudSync();
   }
 
   static getConfig() {
@@ -217,6 +228,7 @@ class StorageManager {
 
   static saveConfig(config) {
     this.set(STORAGE_KEYS.CONFIG, config);
+    this.notifyCloudSync();
   }
 
   static getTheme() {
@@ -293,6 +305,7 @@ class StorageManager {
     this.set(STORAGE_KEYS.TRANSACTIONS, SAMPLE_TRANSACTIONS);
     this.set(STORAGE_KEYS.DEBTS, SAMPLE_DEBTS);
     this.set(STORAGE_KEYS.GOALS, SAMPLE_GOALS);
+    this.notifyCloudSync();
   }
 
   static clearAllData() {
@@ -300,5 +313,6 @@ class StorageManager {
     this.set(STORAGE_KEYS.TRANSACTIONS, []);
     this.set(STORAGE_KEYS.DEBTS, []);
     this.set(STORAGE_KEYS.GOALS, []);
+    this.notifyCloudSync();
   }
 }

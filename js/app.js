@@ -3,28 +3,36 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Inicializar Almacenamiento
+  // 1. Inicializar Almacenamiento Local
   StorageManager.initStorage();
 
-  // 2. Inicializar Tema (Claro / Oscuro)
+  // 2. Inicializar Firebase (Auth con Google y Cloud Firestore)
+  if (typeof FirebaseService !== 'undefined') {
+    FirebaseService.init();
+  }
+
+  // 3. Inicializar Tema (Claro / Oscuro)
   initTheme();
 
-  // 3. Inicializar Selector de Mes
+  // 4. Inicializar Selector de Mes
   initMonthSelector();
 
-  // 4. Inicializar Navegación por Pestañas
+  // 5. Inicializar Navegación por Pestañas
   initTabs();
 
-  // 5. Inicializar Modales y Formularios
+  // 6. Inicializar Modales y Formularios
   initModalsAndForms();
 
-  // 6. Inicializar Calculadoras Interactivas
+  // 7. Inicializar Eventos de Autenticación Firebase
+  initFirebaseAuthEvents();
+
+  // 8. Inicializar Calculadoras Interactivas
   initInteractiveCalculators();
 
-  // 7. Inicializar Eventos de Configuración y Respaldo
+  // 9. Inicializar Eventos de Configuración y Respaldo
   initSettingsAndBackup();
 
-  // 8. Renderizar Vista Inicial (Planilla de Gastos Fijos)
+  // 10. Renderizar Vista Inicial (Planilla de Gastos Fijos)
   UIManager.switchTab('fixed_sheet');
 
   if (window.lucide) lucide.createIcons();
@@ -73,6 +81,50 @@ function initTabs() {
         UIManager.switchTab(tabName);
       }
     });
+  });
+}
+
+function initFirebaseAuthEvents() {
+  // Botón Iniciar Sesión con Google
+  document.getElementById('btn-google-login')?.addEventListener('click', async () => {
+    await FirebaseService.loginWithGoogle();
+  });
+
+  // Botón Cerrar Sesión
+  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    await FirebaseService.logout();
+  });
+
+  // Forzar Sincronización a Firestore
+  document.getElementById('btn-force-sync')?.addEventListener('click', async () => {
+    if (!FirebaseService.currentUser) {
+      UIManager.showToast('Inicia sesión con Google para sincronizar con Firestore', 'warning');
+      return;
+    }
+    await FirebaseService.syncToFirestore();
+    UIManager.showToast('Datos sincronizados con Cloud Firestore.');
+  });
+
+  // Guardar Credenciales personalizadas de Firebase
+  document.getElementById('form-firebase-config')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const apiKey = document.getElementById('fb-api-key').value.trim();
+    const appId = document.getElementById('fb-app-id').value.trim();
+    const authDomain = document.getElementById('fb-auth-domain').value.trim();
+    const projectId = document.getElementById('fb-project-id').value.trim() || 'presu-e7466';
+
+    const customConfig = {
+      apiKey,
+      appId,
+      authDomain,
+      projectId,
+      storageBucket: `${projectId}.firebasestorage.app`,
+      messagingSenderId: appId.split(':')[1] || "389274920194"
+    };
+
+    FirebaseConfigManager.saveConfig(customConfig);
+    FirebaseService.init();
+    UIManager.showToast('Credenciales de Firebase guardadas.');
   });
 }
 

@@ -46,6 +46,43 @@ class UIManager {
   }
 
   /**
+   * Actualiza el encabezado y estado de autenticación de Firebase
+   */
+  static updateAuthUI(user) {
+    const loginBtn = document.getElementById('btn-google-login');
+    const userBadge = document.getElementById('user-profile-badge');
+    const userAvatar = document.getElementById('user-avatar');
+    const userName = document.getElementById('user-name');
+    const syncStatusEl = document.getElementById('cloud-sync-status');
+
+    if (user) {
+      if (loginBtn) loginBtn.classList.add('hidden');
+      if (userBadge) {
+        userBadge.classList.remove('hidden');
+        userBadge.classList.add('flex');
+      }
+      if (userAvatar) {
+        userAvatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=2563eb&color=fff`;
+      }
+      if (userName) {
+        userName.textContent = user.displayName || user.email.split('@')[0];
+      }
+      if (syncStatusEl) {
+        syncStatusEl.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span><span>Nube activa (Firestore)</span>';
+      }
+    } else {
+      if (loginBtn) loginBtn.classList.remove('hidden');
+      if (userBadge) {
+        userBadge.classList.add('hidden');
+        userBadge.classList.remove('flex');
+      }
+      if (syncStatusEl) {
+        syncStatusEl.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5"></span><span>Modo local</span>';
+      }
+    }
+  }
+
+  /**
    * Renderiza la Planilla de Gastos Fijos (Fiel al Excel del usuario)
    */
   static renderFixedSheet() {
@@ -145,7 +182,7 @@ class UIManager {
       `;
     }
 
-    // 3. Renderizar Gráfico Donut de Gastos Fijos (Fiel al gráfico de la imagen)
+    // 3. Renderizar Gráfico Donut de Gastos Fijos
     ChartsManager.renderFixedExpensesChart('sheet-donut-chart', summary.items, config.currencySymbol);
 
     if (window.lucide) lucide.createIcons();
@@ -300,11 +337,9 @@ class UIManager {
     const tableBody = document.getElementById('transactions-table-body');
     const countBadge = document.getElementById('transactions-count-badge');
     const searchInput = document.getElementById('tx-search-input');
-    const filterCat = document.getElementById('tx-filter-category');
     const filterClass = document.getElementById('tx-filter-class');
 
     const query = (searchInput ? searchInput.value.toLowerCase() : '');
-    const selectedCat = (filterCat ? filterCat.value : 'all');
     const selectedClass = (filterClass ? filterClass.value : 'all');
 
     let filtered = transactions.filter(t => t.date.startsWith(this.selectedMonth));
@@ -317,7 +352,6 @@ class UIManager {
       );
     }
 
-    if (selectedCat !== 'all') filtered = filtered.filter(t => t.category === selectedCat);
     if (selectedClass !== 'all') filtered = filtered.filter(t => t.classification === selectedClass);
 
     filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -612,7 +646,21 @@ class UIManager {
       case 'transactions': this.renderTransactions(); break;
       case '503020': this.render503020View(); break;
       case '3steps': this.render3StepsView(); break;
+      case 'settings': this.renderSettings(); break;
     }
+  }
+
+  static renderSettings() {
+    const fbConfig = FirebaseConfigManager.getConfig();
+    const apiKeyInput = document.getElementById('fb-api-key');
+    const appIdInput = document.getElementById('fb-app-id');
+    const authDomainInput = document.getElementById('fb-auth-domain');
+    const projectIdInput = document.getElementById('fb-project-id');
+
+    if (apiKeyInput) apiKeyInput.value = fbConfig.apiKey || '';
+    if (appIdInput) appIdInput.value = fbConfig.appId || '';
+    if (authDomainInput) authDomainInput.value = fbConfig.authDomain || 'presu-e7466.firebaseapp.com';
+    if (projectIdInput) projectIdInput.value = fbConfig.projectId || 'presu-e7466';
   }
 
   static switchTab(tabName) {
