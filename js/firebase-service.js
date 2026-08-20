@@ -12,6 +12,27 @@ class FirebaseService {
   static syncStatus = 'offline'; // 'offline', 'connecting', 'synced', 'syncing', 'error'
   static onStatusChangeCallback = null;
 
+  static getConfig() {
+    // 1. Intentar desde FirebaseConfigManager
+    if (typeof FirebaseConfigManager !== 'undefined') {
+      return FirebaseConfigManager.getConfig();
+    }
+    // 2. Intentar desde localStorage
+    try {
+      const custom = localStorage.getItem('finanzas360_firebase_config');
+      if (custom) return JSON.parse(custom);
+    } catch (e) {}
+    // 3. Fallback a window.DEFAULT_FIREBASE_CONFIG
+    return window.DEFAULT_FIREBASE_CONFIG || {
+      apiKey: "",
+      authDomain: "presu-e7466.firebaseapp.com",
+      projectId: "presu-e7466",
+      storageBucket: "presu-e7466.firebasestorage.app",
+      messagingSenderId: "793889321904",
+      appId: "1:793889321904:web:658e9ef1acb3b6505d1c75"
+    };
+  }
+
   static init() {
     try {
       if (typeof firebase === 'undefined') {
@@ -20,7 +41,13 @@ class FirebaseService {
         return false;
       }
 
-      const config = FirebaseConfigManager.getConfig();
+      const config = this.getConfig();
+
+      if (!config.apiKey || config.apiKey.includes('TU_API_KEY') || config.apiKey.includes('REPLACE')) {
+        console.info('Firebase: Se requiere configurar la API Key para sincronización en la nube.');
+        this.updateStatus('offline');
+        return false;
+      }
 
       // Si ya está inicializado, no duplicar
       if (!firebase.apps.length) {
@@ -41,9 +68,7 @@ class FirebaseService {
             console.warn('Persistencia de Firestore no soportada en este navegador');
           }
         });
-      } catch (e) {
-        // Ignorar si ya está inicializado
-      }
+      } catch (e) {}
 
       this.isInitialized = true;
       this.listenAuthState();
@@ -71,7 +96,6 @@ class FirebaseService {
         this.updateStatus('connecting');
         console.log(`Usuario autenticado: ${user.displayName} (${user.email})`);
         UIManager.showToast(`Bienvenido, ${user.displayName || user.email}`, 'info');
-        // Iniciar escucha en tiempo real de Firestore
         this.startFirestoreListener(user.uid);
       } else {
         console.log('Usuario no autenticado (Modo local)');
@@ -92,8 +116,19 @@ class FirebaseService {
     if (!this.isInitialized) {
       const ok = this.init();
       if (!ok) {
-        UIManager.showToast('Configura tu API Key de Firebase en Configuración para iniciar sesión', 'warning');
-        return;
+        const apiKey = prompt('Ingresa tu Web API Key de Firebase (se guardará de forma privada en tu navegador):');
+        if (apiKey) {
+          const config = this.getConfig();
+          config.apiKey = apiKey.trim();
+          if (typeof FirebaseConfigManager !== 'undefined') {
+            FirebaseConfigManager.saveConfig(config);
+          } else {
+            localStorage.setItem('finanzas360_firebase_config', JSON.stringify(config));
+          }
+          this.init();
+        } else {
+          return;
+        }
       }
     }
 
@@ -115,6 +150,8 @@ class FirebaseService {
         }
       } else if (error.code === 'auth/api-key-not-valid' || error.code === 'auth/invalid-api-key') {
         UIManager.showToast('La API Key de Firebase no es válida. Revisa la pestaña de Configuración.', 'error');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        UIManager.showToast('Dominio no autorizado en Firebase. Agrega tu dominio en Authentication > Settings en Firebase Console.', 'warning');
       } else {
         UIManager.showToast('Error al iniciar sesión: ' + error.message, 'error');
       }
@@ -149,7 +186,6 @@ class FirebaseService {
         const cloudData = doc.data();
         console.log('Datos recibidos en tiempo real desde Firestore:', cloudData);
 
-        // Actualizar almacenamiento local con los datos de la nube
         if (cloudData.fixedExpenses) StorageManager.saveFixedExpenses(cloudData.fixedExpenses);
         if (cloudData.incomeConfig) StorageManager.saveIncomeConfig(cloudData.incomeConfig);
         if (cloudData.transactions) StorageManager.saveTransactions(cloudData.transactions);
@@ -160,7 +196,6 @@ class FirebaseService {
         this.updateStatus('synced');
         UIManager.refreshCurrentView();
       } else {
-        // Primera vez del usuario en la nube: migrar los datos locales a Firestore
         console.log('Creando documento inicial en Firestore con datos locales...');
         await this.syncToFirestore();
       }
