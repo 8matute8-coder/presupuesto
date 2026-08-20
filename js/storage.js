@@ -10,8 +10,11 @@ const STORAGE_KEYS = {
   DEBTS: 'finanzas360_debts',
   GOALS: 'finanzas360_goals',
   CONFIG: 'finanzas360_config',
-  THEME: 'finanzas360_theme'
+  THEME: 'finanzas360_theme',
+  VERSION: 'finanzas360_data_version'
 };
+
+const DATA_VERSION = '2026.08.20.v3';
 
 const DEFAULT_INCOME_CONFIG = {
   baseIncome: 4200000,
@@ -26,17 +29,17 @@ const DEFAULT_CONFIG = {
   debtStrategy: 'snowball', // 'snowball' o 'avalanche'
 };
 
-// Gastos fijos predefinidos según planilla del usuario (100% editables)
+// Gastos fijos actualizados con los importes reales de servicios
 const DEFAULT_FIXED_EXPENSES = [
   { id: 'fix-1', concept: 'Alquiler', amount: 460000, isPaid: false, category: 'Vivienda', classification: 'need' },
   { id: 'fix-2', concept: 'Tarjeta', amount: 534000, isPaid: false, category: 'Finanzas / Tarjetas', classification: 'need' },
-  { id: 'fix-3', concept: 'Agua', amount: 0, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-3', concept: 'Agua', amount: 40000, isPaid: false, category: 'Servicios', classification: 'need' },
   { id: 'fix-4', concept: 'Nafta', amount: 0, isPaid: false, category: 'Transporte', classification: 'need' },
   { id: 'fix-5', concept: 'Patente', amount: 15000, isPaid: false, category: 'Impuestos / Vehículo', classification: 'need' },
-  { id: 'fix-6', concept: 'Luz', amount: 0, isPaid: false, category: 'Servicios', classification: 'need' },
-  { id: 'fix-7', concept: 'Internet', amount: 62000, isPaid: false, category: 'Servicios', classification: 'need' },
-  { id: 'fix-8', concept: 'Celulares', amount: 30000, isPaid: false, category: 'Servicios', classification: 'need' },
-  { id: 'fix-9', concept: 'Gasnor', amount: 40000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-6', concept: 'Luz', amount: 120000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-7', concept: 'Internet', amount: 65000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-8', concept: 'Celulares', amount: 40000, isPaid: false, category: 'Servicios', classification: 'need' },
+  { id: 'fix-9', concept: 'Gas', amount: 50000, isPaid: false, category: 'Servicios', classification: 'need' },
   { id: 'fix-10', concept: 'Colegio Mati', amount: 155000, isPaid: false, category: 'Educación', classification: 'need' },
   { id: 'fix-11', concept: 'Colegio Sol', amount: 280000, isPaid: false, category: 'Educación', classification: 'need' },
   { id: 'fix-12', concept: 'Colegio Lola', amount: 150000, isPaid: false, category: 'Educación', classification: 'need' },
@@ -163,9 +166,46 @@ class StorageManager {
     if (!localStorage.getItem(STORAGE_KEYS.INCOME_CONFIG)) {
       this.set(STORAGE_KEYS.INCOME_CONFIG, DEFAULT_INCOME_CONFIG);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.FIXED_EXPENSES)) {
+
+    const savedVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
+    if (savedVersion !== DATA_VERSION) {
+      // Actualizar automáticamente los servicios cargados a los montos reales indicados
+      const current = this.get(STORAGE_KEYS.FIXED_EXPENSES, []);
+      if (!current || current.length === 0) {
+        this.set(STORAGE_KEYS.FIXED_EXPENSES, DEFAULT_FIXED_EXPENSES);
+      } else {
+        // Actualizar o insertar conceptos de servicios
+        const updates = {
+          'Internet': 65000,
+          'Luz': 120000,
+          'Celulares': 40000,
+          'Gas': 50000,
+          'Gasnor': 50000,
+          'Agua': 40000,
+          'Patente': 15000
+        };
+
+        current.forEach(item => {
+          if (updates[item.concept] !== undefined) {
+            item.amount = updates[item.concept];
+            if (item.concept === 'Gasnor') item.concept = 'Gas';
+          }
+        });
+
+        // Asegurar que existan todos los ítems por defecto
+        DEFAULT_FIXED_EXPENSES.forEach(def => {
+          if (!current.some(c => c.concept.toLowerCase() === def.concept.toLowerCase())) {
+            current.push(def);
+          }
+        });
+
+        this.set(STORAGE_KEYS.FIXED_EXPENSES, current);
+      }
+      localStorage.setItem(STORAGE_KEYS.VERSION, DATA_VERSION);
+    } else if (!localStorage.getItem(STORAGE_KEYS.FIXED_EXPENSES)) {
       this.set(STORAGE_KEYS.FIXED_EXPENSES, DEFAULT_FIXED_EXPENSES);
     }
+
     if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
       this.set(STORAGE_KEYS.TRANSACTIONS, SAMPLE_TRANSACTIONS);
     }
