@@ -1,5 +1,5 @@
 /**
- * ui.js - Renderizado de interfaz de usuario, componentes reactivos, tablas y modales
+ * ui.js - Renderizado de interfaz de usuario, componentes reactivos, tramos de pago y meses
  */
 
 class UIManager {
@@ -45,9 +45,6 @@ class UIManager {
     }, 3500);
   }
 
-  /**
-   * Actualiza el encabezado y estado de autenticación de Firebase
-   */
   static updateAuthUI(user) {
     const loginBtn = document.getElementById('btn-google-login');
     const userBadge = document.getElementById('user-profile-badge');
@@ -83,70 +80,120 @@ class UIManager {
   }
 
   /**
-   * Renderiza la Planilla de Gastos Fijos (Fiel al Excel del usuario)
+   * Renderiza la Planilla de Gastos Fijos (Fiel al Excel del usuario con Tramos de Sueldo y Meses)
    */
   static renderFixedSheet() {
     const config = StorageManager.getConfig();
     const incomeConfig = StorageManager.getIncomeConfig();
-    const fixedExpenses = StorageManager.getFixedExpenses();
-    const summary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig);
+    const fixedExpenses = StorageManager.getFixedExpenses(this.selectedMonth);
+    const summary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig, this.selectedMonth);
 
-    // 1. Renderizar Cuadro de Resumen Azul (Excel style)
+    // Formato legible del mes (ej. Agosto 2026)
+    const [yearNum, monthNum] = this.selectedMonth.split('-').map(Number);
+    const dateObj = new Date(yearNum, monthNum - 1, 1);
+    const monthName = dateObj.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+    const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+    // 1. Renderizar Cuadro de Resumen Azul con Desglose de Tramos de Cobro
     const incomeBox = document.getElementById('sheet-summary-box');
     if (incomeBox) {
+      const { tramo1, tramo2 } = summary.cashFlow;
+
       incomeBox.innerHTML = `
-        <div class="rounded-2xl p-5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl space-y-3">
-          <div class="flex items-center justify-between border-b border-blue-400/40 pb-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-blue-200">Resumen Financiero del Mes</span>
+        <div class="rounded-2xl p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-white shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-blue-400/40 pb-2.5">
+            <div>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Resumen Financiero</span>
+              <h3 class="text-base font-bold text-white">${formattedMonth}</h3>
+            </div>
             <button onclick="UIManager.promptEditIncome()" class="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg font-medium transition-colors">
               ✎ Editar Ingresos
             </button>
           </div>
           
-          <div class="space-y-2 text-sm">
+          <!-- Números Globales -->
+          <div class="grid grid-cols-2 gap-3 text-xs bg-white/10 p-3 rounded-xl">
+            <div>
+              <span class="text-blue-200 block">Total Ingresos:</span>
+              <span class="font-extrabold text-base text-emerald-300">${this.formatCurrency(summary.totalIncome, config.currencySymbol)}</span>
+            </div>
+            <div>
+              <span class="text-blue-200 block">Gastos Fijos (${summary.fixedPercentageOfIncome.toFixed(0)}%):</span>
+              <span class="font-extrabold text-base text-amber-300">${this.formatCurrency(summary.totalFixed, config.currencySymbol)}</span>
+            </div>
+          </div>
+
+          <!-- Esquema de Cobro en 2 Tramos -->
+          <div class="space-y-2 border-t border-blue-400/30 pt-3">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-200 block">
+              🗓️ Cash Flow por Tramos de Sueldo:
+            </span>
+
+            <!-- Tramo 1 (Día 1 ~ 19.5%) -->
+            <div class="p-2.5 rounded-xl bg-blue-950/40 border border-blue-400/30 text-xs space-y-1">
+              <div class="flex justify-between items-center">
+                <strong class="text-blue-200">Tramo 1 (Día 1 - 19.5%):</strong>
+                <span class="font-bold text-white">${this.formatCurrency(tramo1.income, config.currencySymbol)}</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px] text-blue-100">
+                <span>Fijos asignados (Alquiler + Servicios):</span>
+                <span>${this.formatCurrency(tramo1.expenses, config.currencySymbol)}</span>
+              </div>
+              <div class="flex justify-between items-center pt-1 border-t border-blue-800/60 font-semibold ${tramo1.remainder >= 0 ? 'text-emerald-300' : 'text-rose-300'}">
+                <span>Disponible semana 1:</span>
+                <span>${this.formatCurrency(tramo1.remainder, config.currencySymbol)}</span>
+              </div>
+            </div>
+
+            <!-- Tramo 2 (Día 7-10 ~ 80.5%) -->
+            <div class="p-2.5 rounded-xl bg-blue-950/40 border border-blue-400/30 text-xs space-y-1">
+              <div class="flex justify-between items-center">
+                <strong class="text-blue-200">Tramo 2 (Día 7 al 10 - 80.5%):</strong>
+                <span class="font-bold text-white">${this.formatCurrency(tramo2.income, config.currencySymbol)}</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px] text-blue-100">
+                <span>Fijos asignados (Facu + Colegios + Tarjeta):</span>
+                <span>${this.formatCurrency(tramo2.expenses, config.currencySymbol)}</span>
+              </div>
+              <div class="flex justify-between items-center pt-1 border-t border-blue-800/60 font-semibold ${tramo2.remainder >= 0 ? 'text-emerald-300' : 'text-rose-300'}">
+                <span>Disponible restante:</span>
+                <span>${this.formatCurrency(tramo2.remainder, config.currencySymbol)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resto Total y Promedios Diarios -->
+          <div class="space-y-1.5 border-t border-blue-400/30 pt-3 text-xs">
             <div class="flex justify-between items-center">
-              <span class="text-blue-100">Ingresos Base:</span>
-              <span class="font-bold text-base">${this.formatCurrency(summary.baseIncome, config.currencySymbol)}</span>
+              <span class="font-semibold text-blue-100">Resto Total Disponible:</span>
+              <span class="font-extrabold text-lg text-white">${this.formatCurrency(summary.netRemainder, config.currencySymbol)}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span class="text-blue-100">Extras:</span>
-              <span class="font-bold text-base">${this.formatCurrency(summary.extraIncome, config.currencySymbol)}</span>
-            </div>
-            <div class="flex justify-between items-center pt-2 border-t border-blue-400/30">
-              <span class="font-semibold text-blue-100">Total Ingresos:</span>
-              <span class="font-extrabold text-lg text-emerald-300">${this.formatCurrency(summary.totalIncome, config.currencySymbol)}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-blue-100">Gastos Fijos (${summary.fixedPercentageOfIncome.toFixed(0)}%):</span>
-              <span class="font-bold text-base text-amber-300">${this.formatCurrency(summary.totalFixed, config.currencySymbol)}</span>
-            </div>
-            <div class="flex justify-between items-center pt-2 border-t border-blue-400/30">
-              <span class="font-semibold text-blue-100">Resto Disponible:</span>
-              <span class="font-extrabold text-xl text-white">${this.formatCurrency(summary.netRemainder, config.currencySymbol)}</span>
-            </div>
-            <div class="flex justify-between items-center bg-white/10 p-2.5 rounded-xl mt-2">
-              <span class="text-xs text-blue-100">Promedio Gasto Diario (${summary.daysInCurrentMonth} días):</span>
-              <span class="font-bold text-base text-yellow-300">${this.formatCurrency(summary.dailyAverageMonth, config.currencySymbol)}/día</span>
-            </div>
-            <div class="flex justify-between items-center text-xs text-blue-200">
-              <span>Días restantes del mes (${summary.daysRemaining} días):</span>
-              <span class="font-semibold text-white">${this.formatCurrency(summary.dailyAverageRemainingDays, config.currencySymbol)}/día</span>
+            <div class="flex justify-between items-center bg-white/10 p-2 rounded-xl text-xs">
+              <span class="text-blue-100">Promedio Diario (${summary.daysInCurrentMonth} días):</span>
+              <span class="font-bold text-yellow-300">${this.formatCurrency(summary.dailyAverageMonth, config.currencySymbol)}/día</span>
             </div>
           </div>
         </div>
       `;
     }
 
-    // 2. Renderizar Tabla de Gastos Fijos (Estilo Planilla)
+    // 2. Renderizar Tabla de Gastos Fijos
     const tableBody = document.getElementById('fixed-sheet-table-body');
     const totalRow = document.getElementById('fixed-sheet-total-row');
 
     if (tableBody) {
       tableBody.innerHTML = summary.items.map(item => `
         <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-blue-50/40 dark:hover:bg-slate-800/40 transition-colors ${item.isPaid ? 'bg-emerald-50/30 dark:bg-emerald-950/10' : ''}">
-          <td class="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full ${item.amount > 0 ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}"></span>
-            <span>${item.concept}</span>
+          <td class="py-3 px-4">
+            <div class="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full ${item.amount > 0 ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}"></span>
+              <span>${item.concept}</span>
+            </div>
+            <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+              <button onclick="UIManager.toggleItemTramo('${item.id}')" class="px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${item.tramo === 1 ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'}" title="Clic para alternar tramo de cobro">
+                ${item.tramo === 1 ? '📅 Tramo 1 (Día 1)' : '📅 Tramo 2 (Día 7-10)'} ⇄
+              </button>
+            </div>
           </td>
           <td class="py-3 px-4 text-right">
             <button onclick="UIManager.promptEditFixedAmount('${item.id}')" class="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer text-sm px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Clic para editar monto">
@@ -154,7 +201,7 @@ class UIManager {
             </button>
           </td>
           <td class="py-3 px-4 text-center">
-            <button onclick="UIManager.toggleFixedPaid('${item.id}')" class="w-6 h-6 mx-auto rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-colors ${item.isPaid ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600 hover:border-blue-500 text-transparent'}">
+            <button onclick="UIManager.toggleFixedPaid('${item.id}')" class="w-6 h-6 mx-auto rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-colors ${item.isPaid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30' : 'border-slate-300 dark:border-slate-600 hover:border-blue-500 text-transparent'}">
               ✓
             </button>
           </td>
@@ -182,10 +229,32 @@ class UIManager {
       `;
     }
 
-    // 3. Renderizar Gráfico Donut de Gastos Fijos
+    // 3. Gráfico Donut de Gastos Fijos
     ChartsManager.renderFixedExpensesChart('sheet-donut-chart', summary.items, config.currencySymbol);
 
     if (window.lucide) lucide.createIcons();
+  }
+
+  static toggleItemTramo(id) {
+    const fixed = StorageManager.getFixedExpenses(this.selectedMonth);
+    const item = fixed.find(f => f.id === id);
+    if (item) {
+      item.tramo = item.tramo === 1 ? 2 : 1;
+      StorageManager.saveFixedExpenses(fixed, this.selectedMonth);
+      this.refreshCurrentView();
+      this.showToast(`"${item.concept}" asignado a Tramo ${item.tramo}`);
+    }
+  }
+
+  static promptResetMonthPayments() {
+    const [y, m] = this.selectedMonth.split('-').map(Number);
+    const monthName = new Date(y, m - 1, 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+
+    if (confirm(`¿Deseas reiniciar los estados de 'Pagado' para ${monthName}?\n\nLos montos y conceptos se mantendrán intactos y los meses anteriores no sufrirán cambios.`)) {
+      StorageManager.resetMonthPayments(this.selectedMonth);
+      this.refreshCurrentView();
+      this.showToast(`Pagos de ${monthName} reiniciados para el nuevo mes.`);
+    }
   }
 
   /**
@@ -195,10 +264,10 @@ class UIManager {
     const config = StorageManager.getConfig();
     const incomeConfig = StorageManager.getIncomeConfig();
     const transactions = StorageManager.getTransactions();
-    const fixedExpenses = StorageManager.getFixedExpenses();
+    const fixedExpenses = StorageManager.getFixedExpenses(this.selectedMonth);
     const debts = StorageManager.getDebts();
 
-    const fixedSummary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig);
+    const fixedSummary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig, this.selectedMonth);
     const summary = FinanceLogic.getMonthSummary(transactions, this.selectedMonth, fixedExpenses, incomeConfig);
     const budget503020 = FinanceLogic.calculate503020(summary, fixedSummary);
     const health = FinanceLogic.calculateHealthScore(summary, budget503020, debts, fixedSummary);
@@ -218,7 +287,7 @@ class UIManager {
             ${this.formatCurrency(fixedSummary.totalIncome, config.currencySymbol)}
           </div>
           <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Base: ${this.formatCurrency(fixedSummary.baseIncome)} | Extras: ${this.formatCurrency(fixedSummary.extraIncome)}
+            Tramo 1 (19.5%): ${this.formatCurrency(fixedSummary.cashFlow.tramo1.income)} | Tramo 2: ${this.formatCurrency(fixedSummary.cashFlow.tramo2.income)}
           </div>
         </div>
 
@@ -363,7 +432,7 @@ class UIManager {
       tableBody.innerHTML = `
         <tr>
           <td colspan="6" class="py-8 text-center text-slate-400 text-sm">
-            No hay movimientos registrados en este periodo.
+            No hay movimientos registrados en este mes.
           </td>
         </tr>
       `;
@@ -407,8 +476,8 @@ class UIManager {
     const config = StorageManager.getConfig();
     const incomeConfig = StorageManager.getIncomeConfig();
     const transactions = StorageManager.getTransactions();
-    const fixedExpenses = StorageManager.getFixedExpenses();
-    const fixedSummary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig);
+    const fixedExpenses = StorageManager.getFixedExpenses(this.selectedMonth);
+    const fixedSummary = FinanceLogic.getFixedExpensesSummary(fixedExpenses, incomeConfig, this.selectedMonth);
     const summary = FinanceLogic.getMonthSummary(transactions, this.selectedMonth, fixedExpenses, incomeConfig);
     const budget = FinanceLogic.calculate503020(summary, fixedSummary);
 
@@ -538,11 +607,11 @@ class UIManager {
   }
 
   static promptEditFixedAmount(id) {
-    const fixed = StorageManager.getFixedExpenses();
+    const fixed = StorageManager.getFixedExpenses(this.selectedMonth);
     const item = fixed.find(f => f.id === id);
     if (!item) return;
 
-    const newAmountStr = prompt(`Modificar monto para "${item.concept}":`, item.amount);
+    const newAmountStr = prompt(`Modificar monto para "${item.concept}" en este mes:`, item.amount);
     if (newAmountStr === null) return;
     const newAmount = Number(newAmountStr);
     if (isNaN(newAmount) || newAmount < 0) {
@@ -551,27 +620,27 @@ class UIManager {
     }
 
     item.amount = newAmount;
-    StorageManager.saveFixedExpenses(fixed);
+    StorageManager.saveFixedExpenses(fixed, this.selectedMonth);
     this.refreshCurrentView();
     this.showToast(`Monto de ${item.concept} actualizado a $${newAmount.toLocaleString()}`);
   }
 
   static toggleFixedPaid(id) {
-    const fixed = StorageManager.getFixedExpenses();
+    const fixed = StorageManager.getFixedExpenses(this.selectedMonth);
     const item = fixed.find(f => f.id === id);
     if (item) {
       item.isPaid = !item.isPaid;
-      StorageManager.saveFixedExpenses(fixed);
+      StorageManager.saveFixedExpenses(fixed, this.selectedMonth);
       this.refreshCurrentView();
       this.showToast(`${item.concept} marcado como ${item.isPaid ? 'Pagado ✓' : 'Pendiente'}`);
     }
   }
 
   static deleteFixedExpense(id) {
-    if (confirm('¿Eliminar este concepto de gastos fijos?')) {
-      let fixed = StorageManager.getFixedExpenses();
+    if (confirm('¿Eliminar este concepto de gastos fijos para este mes?')) {
+      let fixed = StorageManager.getFixedExpenses(this.selectedMonth);
       fixed = fixed.filter(f => f.id !== id);
-      StorageManager.saveFixedExpenses(fixed);
+      StorageManager.saveFixedExpenses(fixed, this.selectedMonth);
       this.refreshCurrentView();
       this.showToast('Concepto eliminado');
     }

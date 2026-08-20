@@ -156,6 +156,10 @@
           <p class="text-xs text-slate-500 dark:text-slate-400">Edita montos con un clic, marca pagos con ✓ y sincroniza en la nube con Firebase</p>
         </div>
         <div class="flex items-center gap-2">
+          <button id="btn-reset-month-payments" onclick="UIManager.promptResetMonthPayments()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 transition-colors" title="Reinicia los pagos para el mes seleccionado sin perder datos anteriores">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>🔄 Iniciar Nuevo Mes / Limpiar Pagos</span>
+          </button>
           <button id="btn-export-sheet-csv" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors">
             <i data-lucide="download" class="w-4 h-4"></i>
             <span>Exportar CSV</span>
